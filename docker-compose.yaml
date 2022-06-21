@@ -1,0 +1,71 @@
+version: "3.8"             
+
+services:
+
+  rabbitmq:
+    hostname: 'rabbitmq'               # sem hostname nao persiste os dados
+    image: rabbitmq:3.8.14-management
+    container_name: rabbitmq_container  
+    restart: always
+    env_file:
+      - ./config/rabbitmq.env
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia/  
+    ports:      
+      - '5672:5672'     # AMQP protocol port
+      - '15672:15672'   # HTTP management UI
+
+  postgres:
+    image: 'postgres'
+    container_name: postgres_container
+    restart: always
+    env_file:
+      - ./config/postgres.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   
+
+  ms_email:
+    image: 'ms_email:latest'
+    build:
+      context: ./ms_email/docker         
+    container_name: ms_email_container
+    depends_on:
+      - "rabbitmq"
+      - "postgres"   
+    restart: always   
+    env_file:
+      - ./config/ms_email.env     
+    ports:
+      - "8081:8080"
+
+  ms_users:
+    image: 'ms_users:latest'
+    build:
+      context: ./ms_users/docker         
+    container_name: ms_users_container
+    depends_on:
+      - "rabbitmq"
+      - "postgres"  
+    restart: always      
+    env_file:
+      - ./config/ms_users.env     
+    ports:
+      - "8082:8080"      
+          
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4_container
+    depends_on:
+      - "postgres"    
+    restart: always
+    env_file:
+      - ./config/pgadmin.env
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin/       
+    ports:
+      - "5050:80"    
+
+volumes:
+  postgres_data: {}     
+  pgadmin_data: {} 
+  rabbitmq_data: {}

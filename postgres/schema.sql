@@ -1,0 +1,25 @@
+-- Role: user_ms_email
+DROP ROLE IF EXISTS user_ms_email;
+
+CREATE ROLE user_ms_email WITH
+  LOGIN
+  NOSUPERUSER
+  INHERIT
+  NOCREATEDB
+  NOCREATEROLE
+  NOREPLICATION
+  WITH PASSWORD '123456';
+ -- ENCRYPTED PASSWORD 'SCRAM-SHA-256$4096:YBl9Qcj+nLjGWDjiYCa2Ng==$OH3NA2oTx4oKCQC0XodOwf1QYb2Bu3oj3G/tE82fBBw=:hAdcTCiAOL5qWLXrr+ImAnfuZ9HVkx5LuoygS9BaDeE=';
+
+-- Database: ms_email
+
+DROP DATABASE IF EXISTS ms_email;
+
+CREATE DATABASE ms_email
+    WITH 
+    OWNER = user_ms_email
+    ENCODING = 'UTF8'
+    TABLESPACE = pg_default
+    CONNECTION LIMIT = -1;
+
+GRANT ALL ON DATABASE ms_email TO user_ms_email;

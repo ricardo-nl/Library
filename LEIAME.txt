@@ -1,0 +1,112 @@
+1- Pré requisitos
+  - vscode
+  - wsl
+
+2- Gerar o jar de ms_email
+
+   2.1- No vscode, abrir o subdiretório /Library/ms_email
+   2.2- No painel lateral, Mavem, botão direito em ms_email:
+      - Clean
+      - Custom:  package -DskipTests
+   Com isto deve ter sido gerado o arquivo /Library/ms_email/target/ms_email-versao.jar  
+   2.3- Mover o jar gerado para ms_email/docker
+
+3- Abrir o projeto /Library no vscode
+
+4- Gerar os containeres
+   4.1- No cmd, entrar no diretório /Library
+   4.1- > wsl
+   4.2- $ docker-compose up
+
+   Vai dar erro para subir o container do ms_email, pois não há o database
+   e usuário que ele está esperando. 
+   No broser, não vai estar acessível o http://localhost:8080/  
+
+5- Configurar o database      
+   5.1- Acessar o pgadmin com os dados de /config/pgadmin.env.
+        No brower, acessar o pgadmin: http://localhost:5050/
+        Usuário admin@admin.com, senha pass
+   5.2- Criar uma conexão do pgadmin ao postgres:
+      - Botão direito em 'Servers, 'Register' -> 'Server' 
+      - Aba General, Name: qualquer coisa, ex, my_postgres
+      - Aba Connection, Host: o nome do serviço docker, username e password 
+        sao os definidos no serviço do postgres no arquivo do docker-compose.yaml:
+        - Host name/adress: postgres
+        - Username: admin
+        - Password: pass  
+        Ativar o ´save password´
+      - Save  
+   5.3- Criar o database e usuário com base no que foi configurado em /config/ms_email.env 
+      - Expandir a conexão ´my_postgres´ recém criada 
+      - Botão direito em Login/Group Roles, 'Create' -> 'Login'
+      - Aba 'General' Name: ms_email_user
+      - Aba 'Definition' Password: 123456
+      - Aba 'Privileges' Can Login: on
+      - Save
+      - Botão direito em ´Databases´, 'Create' -> 'Database' 
+      - Aba 'General', Database: ms_email, Owner: ms_email_user
+      - Aba 'Security', Privileges, + , Em grantee: ms_email_user, Privileges, all
+      - Save
+
+      Repetir para o usuário ms_users_user e o database ms_users
+
+   5.4- Reiniciar o docker-compose
+      $ docker-compose down
+      $ docker-compose up -d
+   5.5- Ver se a aplicação subiu
+      No browser: http://localhost:8080/
+
+6- Configurar o rabbitmq com os dados de /config/rabbitmq.env
+   6.1- Acessar no browser http://localhost:15672/, myuser mypassword
+   6.2- Criar uma queue para mensagems de email
+      Na aba 'queue', 'add queue', name: ms_email_queue , add queue   
+   6.3- Criar uma exchange para a aplicação do Library
+      Na aba 'Exchanges', 'add a new exchange', name: library_exchange , add exchange  
+   6.4- Criar uma bind, de library_exchange, para ms_email_queue
+      Na aba 'Exchanges', clicar em ´library_exchange´ -> Bindings. 
+      Em ´to queue´: ms_email_queue
+      Em ´routing key´: (key que quisermos). Vamos usar 'green'. Bind 
+
+   6.5- Criar, também, uma bind ´blue´ para uma queue ´generic_queue´   
+
+   Fluxo ficou assim:
+   Producer -> library_exchange -> green -> ms_email_queue -> Consumer
+
+   6.5- Para testar
+  
+   Em library_exhange -> publish messages, preencha o payload, e em 
+   Routing key, coloque ´green´ para que seja enviada para a queue, 
+   e outra key para ver que não vai ser enviada.
+   em 'ms_email_queue´ -> get messages, veja que chegou a mensagem. 
+   Se nao estiver, pode ser que, como a aplicação está no ar, ja 
+   consumiu a mensagem.
+
+   Para testar a aplicação,
+  
+   Em payload, colocar um emailDto:
+
+   {
+    "ownerRef":"Ricardo",
+    "emailFrom":"rnlsystems00@gmail.com",
+    "emailTo":"naberegny@gmail.com",
+    "subject":"teste de subject",
+    "text":"Email roteado pelo rabbitmq"
+   }
+
+   Veja se recebeu o email
+
+   Sempre que uma alteração for feita em uma aplicação que é subpasta de Library, 
+   por ex, Library/ms_email, abrir a pasta ms_email no vscode, gerar o .jar:
+   maven -> clean, maven -> package -DskipTests
+   Copiar o .jar do /target e mover para a pasta /docker.
+   Com o docker, apagar o container do serviço ms_email, e sua imagem. 
+   Re-gerar com o docker-compose.
+
+   TODO 
+
+   - Se eu criar um build mount, ele pega atualizações em voo?
+   - Como forçar a ordem de execução do docker-compose? Por ex, as aplicações precisam
+   do rabbitmq no ar, mas garanto a ordem da execução mas não a total finalização de 
+   um serviço, antes do outro. Não é um problema, pois elas se reiniciam sozinhas. 
+   - A estrutra mais adequada de um projeto é essa mesmo? Seria melhor cada microservice
+   ter seu proprio git.
